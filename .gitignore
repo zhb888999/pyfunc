@@ -1,0 +1,6 @@
+.venv
+.ropeproject
+__pycache__
+a.out
+.tmp*
+.vscode
