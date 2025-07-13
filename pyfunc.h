@@ -52,7 +52,7 @@ class Deserialize {
     if (!ifs_.good())
       throw std::runtime_error("Invalid input stream");
     ifs_.seekg(0, std::ios::end);
-    size_ = is_.tellg();
+    size_ = ifs_.tellg();
     ifs_.seekg(0, std::ios::beg);
   }
 
