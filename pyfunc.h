@@ -707,7 +707,9 @@ private:
     func();
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << msg << " elapsed time: " << duration.count() << "ms" << std::endl;
+    std::cout << "[PyFunc " << modulename_ << "::" << funcname_
+              << "] " << msg << " elapsed time: "
+              << duration.count() << "ms" << std::endl;
   }
 
   template<typename... Args>
