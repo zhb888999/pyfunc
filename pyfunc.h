@@ -84,7 +84,7 @@ class Deserialize {
   std::istream& is_;
   size_t tellg_{0};
   size_t offset_{0};
-  size_t size_;
+  size_t size_{0};
 };
 
 template<typename T>
@@ -160,7 +160,7 @@ struct Converter<None> {
   }
 
   None deserialize(std::istream& is, size_t size) {
-    assert(size == 0);
+    assert(size == 0 && "invalid size");
     return None();
   }
 };
@@ -182,7 +182,7 @@ struct Converter<bool> {
   }
 
   bool deserialize(std::istream& is, size_t size) {
-    assert(size == sizeof(bool));
+    assert(size == sizeof(bool) && "invalid size");
     return buff2type<bool>(is);
   }
 };
@@ -204,7 +204,7 @@ struct Converter<int64_t> {
   }
 
   int64_t deserialize(std::istream& is, size_t size) {
-    assert(size == sizeof(int64_t));
+    assert(size == sizeof(int64_t) && "invalid size");
     return buff2type<int64_t>(is);
   }
 };
@@ -268,7 +268,7 @@ struct Converter<double> {
   }
 
   double deserialize(std::istream& is, size_t size) {
-    assert(size == sizeof(double));
+    assert(size == sizeof(double) && "invalid size");
     return buff2type<double>(is);
   }
 };
@@ -326,7 +326,7 @@ struct Cast<char *> {
     return value;
   }
   char* from(std::string&& value) {
-    assert(false && "not support convert");
+    assert(false && "not support convert to char*");
     return nullptr;
   }
 };
@@ -338,7 +338,7 @@ struct Cast<const char *> {
     return value;
   }
   char* from(std::string&& value) {
-    assert(false && "not support convert");
+    assert(false && "not support convert to const char*");
     return nullptr;
   }
 };
@@ -350,7 +350,7 @@ struct Cast<char[N]> {
     return value;
   }
   char* from(std::string&& value) {
-    assert(false && "not support convert");
+    assert(false && "not support convert to char[]");
     return nullptr;
   }
 };
@@ -590,12 +590,17 @@ size_t SerializeSize::operator()(const T& value, const Args&... args) {
 
 template<typename T>
 T Deserialize::single() {
-  assert(!empty());
+  assert(!empty() && "empty buffer");
   using CT = typename Cast<T>::type;
 
   uint32_t id = buff2type<uint32_t>(is_);
 
-  assert(id == ConvertID<CT>::id);
+  if (id != ConvertID<CT>::id) {
+    std::cout << "deserialize failed, id=" << id 
+              << " expect=" << ConvertID<CT>::id
+              << std::endl;
+    assert(false && "id not match");
+  }
   offset_ += sizeof(uint32_t);
 
   size_t size = buff2type<size_t>(is_);
@@ -672,13 +677,13 @@ public:
 
   template<typename... Args>
   std::tuple<Args...> gets() {
-    assert(deser_);
+    assert(deser_ && "call first or python run failed");
     return deser_->multi<Args...>();
   }
 
   template<typename T>
   T get() { 
-    assert(deser_ != nullptr);
+    assert(deser_ && "call first or python run failed");
     T result;
     timer("deserialize", [this, &result]() {
         result = deser_->single<T>();
@@ -688,12 +693,12 @@ public:
 
   template<typename T>
   bool is() {
-    assert(deser_);
+    assert(deser_ && "call first or python run failed");
     return deser_->is<T>();
   }
 
   void reset() {
-    assert(deser_);
+    assert(deser_ && "call first or python run failed");
     deser_->reset();
   }
 
@@ -707,14 +712,15 @@ private:
     func();
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "[PyFunc " << modulename_ << "::" << funcname_
+    std::cout << "[PyFunc][" << modulename_ << "::" << funcname_
               << "] " << msg << " elapsed time: "
               << duration.count() << "ms" << std::endl;
   }
 
   template<typename... Args>
   bool serializeArgs(const Args&... args) {
-    std::ofstream out(tmpfile_.c_str(), std::ios_base::out | std::ios_base::binary);
+    std::ofstream out(tmpfile_.c_str(),
+                      std::ios_base::out | std::ios_base::binary);
     if (!out.is_open()) {
       std::cout << "[PyFunc][" << modulename_ << "::" << funcname_
                 << "] write tmp file failed!\n";

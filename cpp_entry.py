@@ -58,6 +58,10 @@ class ConverterFactory:
     def serialize_type(self, value: Any) -> List[bytes]:
         data = []
         value_type = type(value)
+        if value_type not in self._converter2id:
+            raise ValueError(f"serialize type {value_type} not registered, "
+                             f"not support as return type")
+
         data.append(self._converter2id[value_type].to_bytes(4, byteorder=sys.byteorder))
         value_data = self[value_type].serialize(value)
         if isinstance(value_data, list):
@@ -224,14 +228,14 @@ def convert_cpp_args(func, vars):
     default_count = len(func.__defaults__) if func.__defaults__ else 0
 
     if var_count < func_var_count - default_count:
-        print(f"cpp_entry args count not match, get {var_count} "
-              f"need min count {func_var_count - default_count}")
-        raise ValueError("cpp_entry args count not match")
+        raise ValueError(f"cpp_entry args count not"
+                         f" match, get {var_count}, "
+                         f"need min count {func_var_count - default_count}")
 
     if var_count > func_var_count:
-        print(f"cpp_entry args count not match, get {var_count} "
-              f"over max count {func_var_count}")
-        raise ValueError("cpp_entry args count not match")
+        raise ValueError(f"cpp_entry args count not"
+                         f" match, get {var_count}, "
+                         f"over max count {func_var_count}")
 
     for var_name, var in zip(func.__code__.co_varnames, vars):
         if var_name not in func.__annotations__:
@@ -263,7 +267,8 @@ def cpp_entry(func):
             dump_result(filename, result)
     except Exception as e:
         traceback.print_exc()
-        print(f"run python {funcname} error={e}")
+        print(f"[cpp_entry][{func.__code__.co_filename}::{func.__name__}] "
+              f'runtime error="{e}"')
         exit(-1)
     else:
         exit(0)

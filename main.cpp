@@ -3,7 +3,7 @@
 int main() {
   PyFunc generate_array("main", "generate_array");
   std::string dtype = "float32";
-  std::vector<int> shape = {10, 1000, 1000};
+  std::vector<int> shape = {1, 1000, 1000};
   generate_array.call(
     shape, dtype
   );
