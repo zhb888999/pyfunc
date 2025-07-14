@@ -458,8 +458,6 @@ struct ConvertID<std::map<K, V>> {
 template<typename K, typename V>
 struct Converter<std::map<K, V>> {
   bool serialize(const std::map<K, V>& value, std::ostream& os) {
-    std::vector<char> result;
-
     Serialize ser(os);
     for (auto& pair: value) {
       if (!ser(pair.first))
@@ -483,8 +481,11 @@ struct Converter<std::map<K, V>> {
   std::map<K, V> deserialize(std::istream& is, size_t size) {
     std::map<K, V> result;
     Deserialize deser(is, size);
-    while (!deser.empty())
-      result.emplace(deser.multi<K, V>());
+    while (!deser.empty()) {
+      auto key = deser.single<K>();
+      auto value = deser.single<V>();
+      result.emplace(std::move(key), std::move(value));
+    }
     return result;
   }
 };
