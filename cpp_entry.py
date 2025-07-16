@@ -3,6 +3,8 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, List, Tuple, Union
 import struct
 import sys
+import os
+import shutil
 
 import numpy as np
 
@@ -215,10 +217,14 @@ def read_cpp_args(filename):
         data = f.read()
         return convert_factory.deserialize(data)
 
-def dump_result(filename, *args):
+def dump_result(filename, result):
     with open(filename, 'wb') as f:
-        for data in convert_factory.serialize(*args):
-            f.write(data)
+        if isinstance(result, tuple):
+            for data in convert_factory.serialize(*result):
+                f.write(data)
+        else:
+            for data in convert_factory.serialize(result):
+                f.write(data)
 
 def convert_cpp_args(func, vars):
     vars = list(vars)
@@ -260,11 +266,7 @@ def cpp_entry(func):
     try:
         func_args = read_cpp_args(filename)
         func_args = convert_cpp_args(func, func_args)
-        result = func(*func_args)
-        if isinstance(result, tuple):
-            dump_result(filename, *result)
-        else:
-            dump_result(filename, result)
+        dump_result(filename, func(*func_args))
     except Exception as e:
         traceback.print_exc()
         print(f"[cpp_entry][{func.__code__.co_filename}::{func.__name__}] "
@@ -272,3 +274,63 @@ def cpp_entry(func):
         exit(-1)
     else:
         exit(0)
+
+def save_cache(filename, cache_file):
+    try:
+        shutil.copyfile(filename, cache_file)
+    except Exception as e:
+        print(f"[cpp_entry] save cache {cache_file} failed, err={e}")
+
+def cpp_entry_with_cache(version: str = "", disable=False):
+    if not os.getenv("PYFUNC_DISABLE_CACHE") is None or disable:
+        return cpp_entry
+    
+    GLOBAL_VERSION = "0"
+
+    def cache_cpp_entry(func):
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        if len(sys.argv) != 4:
+            return wrapper
+
+        _, funcname, filename, magic = sys.argv
+        if magic != "PYFUNC_CALL" or funcname != func.__name__:
+            return wrapper
+        
+        try:
+            with open(filename, 'rb') as f:
+                data = f.read()
+            import hashlib
+            sha256 = hashlib.sha256()
+            sha256.update(GLOBAL_VERSION.encode('utf-8'))
+            sha256.update(version.encode('utf-8'))
+            sha256.update(
+                os.path.basename(func.__code__.co_filename).encode('utf-8')
+            )
+            sha256.update(funcname.encode('utf-8'))
+            sha256.update(data)
+            cache_name = f"PFC{sha256.hexdigest()}"
+            cache_dir = os.getenv("PYFUNC_CACHE_PATH", ".cache")
+            cache_file = os.path.join(cache_dir, cache_name)
+
+            if os.path.exists(cache_file):
+                os.remove(filename)
+                os.symlink(cache_file, filename)
+                print(f"[cpp_entry_with_cache][{funcname}] {cache_file}")
+                exit(0)
+            
+            func_args = convert_factory.deserialize(data)
+            func_args = convert_cpp_args(func, func_args)
+            dump_result(filename, func(*func_args))
+            os.makedirs(cache_dir, exist_ok=True)
+            save_cache(filename, cache_file)
+        except Exception as e:
+            traceback.print_exc()
+            print(f"[cpp_entry_with_cache][{func.__code__.co_filename}::{func.__name__}] "
+                  f'runtime error="{e}"')
+            exit(-1)
+        else:
+            exit(0)
+
+    return cache_cpp_entry

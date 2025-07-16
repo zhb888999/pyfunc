@@ -721,6 +721,7 @@ private:
 
   template<typename... Args>
   bool serializeArgs(const Args&... args) {
+    std::remove(tmpfile_.c_str());
     std::ofstream out(tmpfile_.c_str(),
                       std::ios_base::out | std::ios_base::binary);
     if (!out.is_open()) {

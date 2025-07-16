@@ -1,10 +1,10 @@
 import numpy as np
 from typing import Tuple
 
-from cpp_entry import cpp_entry
+from cpp_entry import cpp_entry, cpp_entry_with_cache
 
 
-@cpp_entry
+@cpp_entry_with_cache()
 def generate_array(shape, dtype):
     print(shape)
     return np.random.random(shape).astype(dtype)
