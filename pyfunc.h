@@ -32,7 +32,8 @@ class Serialize {
   Serialize(std::ostream& os) : os_(os) {}
   ~Serialize() { os_.flush(); }
 
-  bool operator()();
+  bool operator()() { return true; }
+
 
   template<typename T>
   bool operator()(const T& value);
@@ -534,10 +535,6 @@ struct Converter<NDArray> {
   }
 };
 
-
-bool Serialize::operator()() {
-  return true;
-}
 
 template<typename T>
 bool Serialize::operator()(const T& value) {
